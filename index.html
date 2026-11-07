@@ -147,7 +147,7 @@
 
     <script>
         // ==========================================
-        // ⚙️ GITHUB CONFIGURATION (Updated Token)
+        // ⚙️ GITHUB CONFIGURATION
         // ==========================================
         const GH_CONFIG = {
             owner: 'NYILINNTHU',
@@ -155,7 +155,8 @@
             token: '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'
         };
 
-        let transactions = JSON.parse(localStorage.getItem('amh_ledger_cat')) || [
+        // DATA ANCHOR START
+        const defaultTransactions = [
             { date: '2026-10-28', desc: 'Opening Balance', category: 'Financial & Bank', dr: 89000000, cr: 0, remark: '' },
             { date: '2026-10-30', desc: 'Thiri Kyaw Transfer', category: 'Transfers & Loans', dr: 0, cr: 930000, remark: '' },
             { date: '2026-10-31', desc: 'Naing Wai Yan Tun Borrow', category: 'Transfers & Loans', dr: 0, cr: 200000, remark: '' },
@@ -164,8 +165,12 @@
             { date: '2026-11-01', desc: 'Bank Charges', category: 'Financial & Bank', dr: 0, cr: 14460, remark: '' },
             { date: '2026-11-02', desc: 'Cars Acessories', category: 'Operations & Assets', dr: 0, cr: 102000, remark: '' },
             { date: '2026-11-02', desc: 'Pun Hlaing Golf Club Coffee', category: 'Lifestyle & Personal', dr: 0, cr: 105000, remark: '' },
-            { date: '2026-11-04', desc: 'Car Repair', category: 'Operations & Assets', dr: 0, cr: 62000, remark: '' }
+            { date: '2026-11-04', desc: 'Car Repair', category: 'Operations & Assets', dr: 0, cr: 62000, remark: '' },
+            { date: '2026-11-06', desc: 'Buy same', category: 'Operations & Assets', dr: 1000000, cr: 0, remark: '' }
         ];
+        // DATA ANCHOR END
+
+        let transactions = JSON.parse(localStorage.getItem('amh_ledger_cat')) || defaultTransactions;
 
         let balanceChartInstance = null;
         let categoryChartInstance = null;
@@ -262,7 +267,8 @@
         function resetData() {
             if (confirm('မူလ စာရင်းများသို့ ပြန်လည် သတ်မှတ်ရန် သေချာပါသလား?')) {
                 localStorage.removeItem('amh_ledger_cat');
-                location.reload();
+                transactions = [...defaultTransactions];
+                render();
             }
         }
 
@@ -291,15 +297,22 @@
                 const sha = fileData.sha;
                 const decodedContent = decodeURIComponent(escape(window.atob(fileData.content)));
 
-                // 2. Overwrite transactions array
+                // 2. Overwrite defaultTransactions array specifically using ANCHORS
                 const newTransactionsStr = JSON.stringify(transactions, null, 4);
-                const regex = /let transactions = JSON\.parse\(localStorage\.getItem\('amh_ledger_cat'\)\) \|\| \[[\s\S]*?\];/;
+                const startTag = '// DATA ANCHOR START';
+                const endTag = '// DATA ANCHOR END';
 
-                if (!regex.test(decodedContent)) {
-                    throw new Error('index.html ဖိုင်ထဲတွင် transactions array ကို ရှာမတွေ့ပါ။');
+                const startIndex = decodedContent.indexOf(startTag);
+                const endIndex = decodedContent.indexOf(endTag);
+
+                if (startIndex === -1 || endIndex === -1) {
+                    throw new Error('index.html ဖိုင်ထဲတွင် DATA ANCHOR များကို ရှာမတွေ့ပါ။');
                 }
 
-                const updatedContent = decodedContent.replace(regex, `let transactions = JSON.parse(localStorage.getItem('amh_ledger_cat')) || ${newTransactionsStr};`);
+                const updatedContent = decodedContent.substring(0, startIndex + startTag.length) +
+                    `\n        const defaultTransactions = ${newTransactionsStr};\n        ` +
+                    decodedContent.substring(endIndex);
+
                 const base64Content = btoa(unescape(encodeURIComponent(updatedContent)));
 
                 // 3. Push commit back to GitHub

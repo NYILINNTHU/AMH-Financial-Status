@@ -147,12 +147,12 @@
 
     <script>
         // ==========================================
-        // ⚙️ GITHUB CONFIGURATION
+        // ⚙️ GITHUB CONFIGURATION (Updated Token)
         // ==========================================
         const GH_CONFIG = {
             owner: 'NYILINNTHU',
             repo: 'AMH-Financial-Status',
-            token: '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'
+            token: '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'
         };
 
         // DATA ANCHOR START
@@ -290,7 +290,7 @@
                 });
 
                 if (!getRes.ok) {
-                    throw new Error('GitHub API Error: Repository (သို့) Token အချက်အလက် မှားယွင်းနေပါသည်။');
+                    throw new Error('GitHub API Error: 401 Unauthorized (Token သို့မဟုတ် Repository အချက်အလက် မှားယွင်းနေပါသည်။)');
                 }
 
                 const fileData = await getRes.json();

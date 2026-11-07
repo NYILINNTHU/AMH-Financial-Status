@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="my">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AMH Financial Status</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.js"></script>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Pyidaungsu Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Pyidaungsu:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Pyidaungsu', -apple-system, BlinkMacSystemFont, sans-serif; background-color: #f8fafc; }
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 pb-20 antialiased">
+
+    <!-- Mobile Header -->
+    <header class="bg-indigo-900 text-white sticky top-0 z-50 shadow-md">
+        <div class="max-w-4xl mx-auto px-4 py-4 flex justify-between items-center">
+            <div>
+                <h1 class="text-xl font-bold tracking-tight">AMH Financial Status</h1>
+                <p class="text-indigo-200 text-xs mt-0.5">ဘဏ္ဍာရေး အခြေအနေနှင့် ငွေစာရင်း</p>
+            </div>
+            <div class="flex gap-2 items-center">
+                <button id="syncBtn" onclick="syncToGitHub()" class="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white text-xs font-semibold px-3 py-2 rounded-lg transition shadow-sm flex items-center gap-1">
+                    ☁️ Sync GitHub
+                </button>
+                <button onclick="exportCSV()" class="bg-indigo-700 hover:bg-indigo-600 text-white text-xs font-semibold px-3 py-2 rounded-lg transition shadow-sm">
+                    📥 CSV
+                </button>
+                <button onclick="resetData()" class="bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold px-3 py-2 rounded-lg transition shadow-sm">
+                    🔄 Reset
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto px-4 py-4 space-y-4">
+
+        <!-- Summary Cards Grid -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-100 flex flex-col justify-between">
+                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">စုစုပေါင်း ဝင်ငွေ (Dr)</span>
+                <p id="totalInflow" class="text-xl font-bold text-emerald-600 mt-1">0 MMK</p>
+            </div>
+            <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-100 flex flex-col justify-between">
+                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">စုစုပေါင်း ထွက်ငွေ (Cr)</span>
+                <p id="totalOutflow" class="text-xl font-bold text-rose-600 mt-1">0 MMK</p>
+            </div>
+            <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-100 flex flex-col justify-between sm:col-span-1">
+                <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">လက်ရှိ လက်ကျန်ငွေ</span>
+                <p id="currentBalance" class="text-xl font-bold text-indigo-600 mt-1">0 MMK</p>
+            </div>
+        </div>
+
+        <!-- Visual Analytics -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+                <h2 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-1.5">📊 Category Breakdown</h2>
+                <div class="relative h-56 flex justify-center items-center">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+            <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+                <h2 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-1.5">📈 Balance Trend</h2>
+                <div class="relative h-56">
+                    <canvas id="balanceChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Transaction Form -->
+        <div class="bg-white rounded-xl p-4 shadow-sm border border-slate-100">
+            <h2 class="text-sm font-bold text-slate-700 mb-3">➕ စာရင်းအသစ် ထည့်သွင်းရန်</h2>
+            <form id="txForm" onsubmit="addTransaction(event)" class="space-y-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">ရက်စွဲ (Date)</label>
+                        <input type="date" id="txDate" required class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">Category (အမျိုးအစား)</label>
+                        <select id="txCategory" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                            <option value="Operations & Assets">🚗 Operations & Assets</option>
+                            <option value="Transfers & Loans">💸 Transfers & Loans</option>
+                            <option value="Social & Donations">🤝 Social & Donations</option>
+                            <option value="Lifestyle & Personal">☕ Lifestyle & Personal</option>
+                            <option value="Financial & Bank">🏦 Financial & Bank</option>
+                        </select>
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">အကြောင်းအရာ (Description)</label>
+                    <input type="text" id="txDesc" placeholder="ဥပမာ - Car Purchase" required class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">ဝင်ငွေ (Dr)</label>
+                        <input type="number" id="txDr" placeholder="0" value="0" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-slate-600 mb-1">ထွက်ငွေ (Cr)</label>
+                        <input type="number" id="txCr" placeholder="0" value="0" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-600 mb-1">မှတ်ချက် (Remark)</label>
+                    <input type="text" id="txRemark" placeholder="မှတ်ချက် (ရှိပါက)" class="w-full bg-slate-50 border border-slate-200 rounded-lg p-2.5 text-xs text-slate-800 focus:bg-white focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                </div>
+                <button type="submit" class="w-full bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-xs font-semibold py-3 rounded-lg transition shadow-sm">
+                    စာရင်းသွင်းမည်
+                </button>
+            </form>
+        </div>
+
+        <!-- Ledger Table -->
+        <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden">
+            <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+                <h2 class="text-sm font-bold text-slate-700">📋 ငွေစာရင်း ရွှေ့ပြောင်းမှုများ (Ledger)</h2>
+                <span id="txCount" class="text-xs bg-indigo-50 text-indigo-700 font-semibold px-2.5 py-1 rounded-full">0 ခု</span>
+            </div>
+            <div class="overflow-x-auto w-full">
+                <table class="w-full text-left border-collapse text-xs whitespace-nowrap">
+                    <thead>
+                        <tr class="bg-slate-100/70 text-slate-600 font-semibold border-b border-slate-200">
+                            <th class="p-3 text-center w-8">#</th>
+                            <th class="p-3">Date</th>
+                            <th class="p-3">Description</th>
+                            <th class="p-3">Category</th>
+                            <th class="p-3 text-right">Dr (ဝင်)</th>
+                            <th class="p-3 text-right">Cr (ထွက်)</th>
+                            <th class="p-3 text-right">Balance</th>
+                            <th class="p-3">Remark</th>
+                            <th class="p-3 text-center">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody id="txTableBody" class="divide-y divide-slate-100"></tbody>
+                </table>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // ==========================================
+        // ⚙️ GITHUB CONFIGURATION (Pre-configured)
+        // ==========================================
+        const GH_CONFIG = {
+            owner: 'NYILINNTHU',
+            repo: 'AMH-Financial-Status',
+            token: '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'
+        };
+
+        let transactions = JSON.parse(localStorage.getItem('amh_ledger_cat')) || [
+            { date: '2026-10-28', desc: 'Opening Balance', category: 'Financial & Bank', dr: 89000000, cr: 0, remark: '' },
+            { date: '2026-10-30', desc: 'Thiri Kyaw Transfer', category: 'Transfers & Loans', dr: 0, cr: 930000, remark: '' },
+            { date: '2026-10-31', desc: 'Naing Wai Yan Tun Borrow', category: 'Transfers & Loans', dr: 0, cr: 200000, remark: '' },
+            { date: '2026-10-31', desc: 'Rice And Eggs Donation', category: 'Social & Donations', dr: 0, cr: 2775000, remark: '' },
+            { date: '2026-11-01', desc: 'Car Purchase', category: 'Operations & Assets', dr: 0, cr: 72300000, remark: 'Nisan Cedric 1D-2678' },
+            { date: '2026-11-01', desc: 'Bank Charges', category: 'Financial & Bank', dr: 0, cr: 14460, remark: '' },
+            { date: '2026-11-02', desc: 'Cars Acessories', category: 'Operations & Assets', dr: 0, cr: 102000, remark: '' },
+            { date: '2026-11-02', desc: 'Pun Hlaing Golf Club Coffee', category: 'Lifestyle & Personal', dr: 0, cr: 105000, remark: '' },
+            { date: '2026-11-04', desc: 'Car Repair', category: 'Operations & Assets', dr: 0, cr: 62000, remark: '' }
+        ];
+
+        let balanceChartInstance = null;
+        let categoryChartInstance = null;
+
+        document.getElementById('txDate').valueAsDate = new Date();
+
+        function formatNumber(num) {
+            return num.toLocaleString('en-US');
+        }
+
+        function render() {
+            const tbody = document.getElementById('txTableBody');
+            tbody.innerHTML = '';
+
+            let currentBal = 0;
+            let totalIn = 0;
+            let totalOut = 0;
+            let catTotals = {
+                'Operations & Assets': 0,
+                'Transfers & Loans': 0,
+                'Social & Donations': 0,
+                'Lifestyle & Personal': 0,
+                'Financial & Bank': 0
+            };
+
+            transactions.forEach((tx, index) => {
+                const dr = Number(tx.dr) || 0;
+                const cr = Number(tx.cr) || 0;
+                const cat = tx.category || 'Financial & Bank';
+
+                if (index === 0) {
+                    currentBal = dr;
+                } else {
+                    currentBal = currentBal + dr - cr;
+                }
+
+                totalIn += dr;
+                totalOut += cr;
+                if (cr > 0 && catTotals[cat] !== undefined) {
+                    catTotals[cat] += cr;
+                }
+
+                const tr = document.createElement('tr');
+                tr.className = "hover:bg-slate-50 transition";
+                tr.innerHTML = `
+                    <td class="p-3 text-center text-slate-400 font-medium">${index + 1}</td>
+                    <td class="p-3 text-slate-600">${tx.date}</td>
+                    <td class="p-3 font-semibold text-slate-800">${tx.desc}</td>
+                    <td class="p-3"><span class="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded text-xs font-medium">${cat}</span></td>
+                    <td class="p-3 text-right text-emerald-600 font-medium">${dr > 0 ? formatNumber(dr) : ''}</td>
+                    <td class="p-3 text-right text-rose-600 font-medium">${cr > 0 ? formatNumber(cr) : ''}</td>
+                    <td class="p-3 text-right font-bold text-indigo-600">${formatNumber(currentBal)}</td>
+                    <td class="p-3 text-slate-500 text-xs">${tx.remark || ''}</td>
+                    <td class="p-3 text-center">
+                        <button onclick="deleteTx(${index})" class="text-rose-500 hover:text-rose-700 font-semibold text-xs bg-rose-50 hover:bg-rose-100 px-2 py-1 rounded transition">ဖျက်ရန်</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            document.getElementById('totalInflow').innerText = formatNumber(totalIn) + ' MMK';
+            document.getElementById('totalOutflow').innerText = formatNumber(totalOut) + ' MMK';
+            document.getElementById('currentBalance').innerText = formatNumber(currentBal) + ' MMK';
+            document.getElementById('txCount').innerText = transactions.length + ' ခု';
+
+            localStorage.setItem('amh_ledger_cat', JSON.stringify(transactions));
+            renderCharts(catTotals);
+        }
+
+        function addTransaction(e) {
+            e.preventDefault();
+            const date = document.getElementById('txDate').value;
+            const desc = document.getElementById('txDesc').value;
+            const category = document.getElementById('txCategory').value;
+            const dr = parseFloat(document.getElementById('txDr').value) || 0;
+            const cr = parseFloat(document.getElementById('txCr').value) || 0;
+            const remark = document.getElementById('txRemark').value;
+
+            transactions.push({ date, desc, category, dr, cr, remark });
+            document.getElementById('txForm').reset();
+            document.getElementById('txDate').valueAsDate = new Date();
+            document.getElementById('txDr').value = 0;
+            document.getElementById('txCr').value = 0;
+            render();
+        }
+
+        function deleteTx(index) {
+            if (confirm('ဤစာရင်းကို ဖျက်ရန် သေချာပါသလား?')) {
+                transactions.splice(index, 1);
+                render();
+            }
+        }
+
+        function resetData() {
+            if (confirm('မူလ စာရင်းများသို့ ပြန်လည် သတ်မှတ်ရန် သေချာပါသလား?')) {
+                localStorage.removeItem('amh_ledger_cat');
+                location.reload();
+            }
+        }
+
+        // Direct Sync to GitHub API Function
+        async function syncToGitHub() {
+            const btn = document.getElementById('syncBtn');
+            btn.innerText = '⏳ Syncing...';
+            btn.disabled = true;
+
+            try {
+                const apiBase = `https://api.github.com/repos/${GH_CONFIG.owner}/${GH_CONFIG.repo}/contents/index.html`;
+
+                // 1. Fetch original file metadata from GitHub
+                const getRes = await fetch(apiBase, {
+                    headers: {
+                        'Authorization': `Bearer ${GH_CONFIG.token}`,
+                        'Accept': 'application/vnd.github+json'
+                    }
+                });
+
+                if (!getRes.ok) {
+                    throw new Error('GitHub API Error: Repository (သို့) Token အချက်အလက် မှားယွင်းနေပါသည်။');
+                }
+
+                const fileData = await getRes.json();
+                const sha = fileData.sha;
+                const decodedContent = decodeURIComponent(escape(window.atob(fileData.content)));
+
+                // 2. Overwrite transactions array
+                const newTransactionsStr = JSON.stringify(transactions, null, 4);
+                const regex = /let transactions = JSON\.parse\(localStorage\.getItem\('amh_ledger_cat'\)\) \|\| \[[\s\S]*?\];/;
+
+                if (!regex.test(decodedContent)) {
+                    throw new Error('index.html ဖိုင်ထဲတွင် transactions array ကို ရှာမတွေ့ပါ။');
+                }
+
+                const updatedContent = decodedContent.replace(regex, `let transactions = JSON.parse(localStorage.getItem('amh_ledger_cat')) || ${newTransactionsStr};`);
+                const base64Content = btoa(unescape(encodeURIComponent(updatedContent)));
+
+                // 3. Push commit back to GitHub
+                const putRes = await fetch(apiBase, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${GH_CONFIG.token}`,
+                        'Accept': 'application/vnd.github+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: `Update financial transactions via web app - ${new Date().toLocaleString()}`,
+                        content: base64Content,
+                        sha: sha
+                    })
+                });
+
+                if (!putRes.ok) {
+                    const errJson = await putRes.json();
+                    throw new Error(errJson.message || 'GitHub သို့ တင်၍မရပါ။');
+                }
+
+                alert('✅ GitHub သို့ အောင်မြင်စွာ Sync လုပ်ပြီးပါပြီ!');
+            } catch (error) {
+                alert('⚠️ Error: ' + error.message);
+            } finally {
+                btn.innerText = '☁️ Sync GitHub';
+                btn.disabled = false;
+            }
+        }
+
+        function renderCharts(catTotals) {
+            let runningBal = 0;
+            const labels = [];
+            const dataPoints = [];
+
+            transactions.forEach((tx, index) => {
+                const dr = Number(tx.dr) || 0;
+                const cr = Number(tx.cr) || 0;
+                if (index === 0) runningBal = dr;
+                else runningBal = runningBal + dr - cr;
+
+                labels.push(`${index+1}. ${tx.desc.substring(0, 8)}`);
+                dataPoints.push(runningBal);
+            });
+
+            const ctxLine = document.getElementById('balanceChart').getContext('2d');
+            if (balanceChartInstance) balanceChartInstance.destroy();
+
+            balanceChartInstance = new Chart(ctxLine, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Balance',
+                        data: dataPoints,
+                        borderColor: '#4f46e5',
+                        backgroundColor: 'rgba(79, 70, 229, 0.05)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.2,
+                        pointRadius: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: false, grid: { color: '#f1f5f9' }, ticks: { font: { size: 10 } } },
+                        x: { grid: { display: false }, ticks: { font: { size: 9 } } }
+                    }
+                }
+            });
+
+            const ctxDoughnut = document.getElementById('categoryChart').getContext('2d');
+            if (categoryChartInstance) categoryChartInstance.destroy();
+
+            categoryChartInstance = new Chart(ctxDoughnut, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(catTotals),
+                    datasets: [{
+                        data: Object.values(catTotals),
+                        backgroundColor: ['#4f46e5', '#0ea5e9', '#10b981', '#f59e0b', '#64748b'],
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { position: 'bottom', labels: { boxWidth: 10, font: { size: 10 } } }
+                    }
+                }
+            });
+        }
+
+        function exportCSV() {
+            let csv = 'No,Date,Description,Category,Dr,Cr,Balance,Remark\n';
+            let bal = 0;
+            transactions.forEach((tx, i) => {
+                const dr = Number(tx.dr) || 0;
+                const cr = Number(tx.cr) || 0;
+                if (i === 0) bal = dr;
+                else bal = bal + dr - cr;
+                csv += `${i+1},${tx.date},"${tx.desc}","${tx.category || ''}",${dr},${cr},${bal},"${tx.remark || ''}"\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'AMH_Financial_Status.csv';
+            link.click();
+        }
+
+        render();
+    </script>
+</body>
+</html>
